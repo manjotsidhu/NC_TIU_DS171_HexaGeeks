@@ -11,6 +11,7 @@ from flask_jwt_extended import get_jwt_identity
 from mongoengine import ReferenceField
 
 from resources.utils import get_file_extension, UPLOAD_FOLDER, random_pin
+from services.scanner.scanning import scanner
 from .db import db
 
 
@@ -21,7 +22,7 @@ class User(db.Document):
     password = db.StringField(required=True, min_length=6)
     dob = db.StringField(required=True)
     role = db.StringField(default='user')
-    costOfPaper = db.IntField(default=0.50)
+    costOfPaper = db.DecimalField(default=0.50)
     verified = db.BooleanField(default=False)
     verification_pin = db.StringField(default=str(random_pin(6)))
     approved = db.BooleanField(default=False)
@@ -115,7 +116,7 @@ class Storage(db.Document):
             output = os.path.join(UPLOAD_FOLDER, fileName + "_scanned." + self.fileExtension)
             file.save(input)
 
-            scan(input, output)
+            scanner(input, output)
             self.file = fileName + "_scanned." + self.fileExtension
         else:
             file.save(os.path.join(UPLOAD_FOLDER, self.file))
