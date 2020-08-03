@@ -24,6 +24,7 @@ import java.util.Map;
 import androidx.appcompat.app.AppCompatActivity;
 import hexageeks.daftar.R;
 import hexageeks.daftar.backend.ServerRequestQueue;
+import hexageeks.daftar.models.User;
 
 import static hexageeks.daftar.backend.ServerConfig.host;
 
@@ -46,20 +47,35 @@ public class SplashScreen extends AppCompatActivity {
             JsonObjectRequest loginRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
                 @Override
                 public void onResponse(JSONObject response) {
-                    Intent dashboardIntent = new Intent(getApplicationContext(), Dashboard.class);
-                    startActivity(dashboardIntent);
-                    finish();
 
-                    Log.v(TAG, "Login Successful: ");
+                    try {
+                        User.setInstance(response.getJSONObject("_id").getString("$oid"), response.getString("first_name"),
+                                response.getString("last_name"), response.getString("dob"),
+                                response.getString("role"), token);
+
+                        Intent dashboardIntent = new Intent(getApplicationContext(), PinActivity.class);
+                        startActivity(dashboardIntent);
+                        finish();
+
+                        Log.v(TAG, "Login Successful: " + User.instance.toString());
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+
+                        Intent loginIntent = new Intent(getApplicationContext(), LoginScreen.class);
+                        startActivity(loginIntent);
+                        finish();
+                    }
                 }
             }, new Response.ErrorListener() {
                 @Override
                 public void onErrorResponse(VolleyError error) {
+                    try{
                     Log.e(TAG, "Failed: " + error
                             + "\nStatus Code " + error.networkResponse.statusCode
                             + "\nCause " + error.getCause()
                             + "\nnetworkResponse " + error.networkResponse.data.toString()
-                            + "\nmessage" + error.getMessage());
+                            + "\nmessage" + error.getMessage());}
+                    catch (Exception e){}
 
                     Intent loginIntent = new Intent(getApplicationContext(), LoginScreen.class);
                     startActivity(loginIntent);

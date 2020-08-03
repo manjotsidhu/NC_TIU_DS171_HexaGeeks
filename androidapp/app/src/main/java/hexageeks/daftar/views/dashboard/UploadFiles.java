@@ -6,15 +6,26 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import com.google.android.material.snackbar.Snackbar;
+import com.squareup.picasso.Picasso;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+
 import hexageeks.daftar.R;
+import hexageeks.daftar.backend.DataProvider;
+import hexageeks.daftar.models.User;
 import hexageeks.daftar.utils.StorageUtils;
 
 public class UploadFiles extends AppCompatActivity {
@@ -31,6 +42,13 @@ public class UploadFiles extends AppCompatActivity {
     private Button selectFileButton;
     private ImageView previewFile;
     private Button submitButton;
+    private Snackbar snackbar;
+
+    private String mimeType = null;
+    private Uri fileUri = null;
+
+    private CheckBox scan;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,7 +64,9 @@ public class UploadFiles extends AppCompatActivity {
         selectFileButton = findViewById(R.id.upload_doc_file);
         previewFile = findViewById(R.id.upload_doc_preview);
         submitButton = findViewById(R.id.upload_doc_submit_btn);
-
+        snackbar = Snackbar.make(findViewById(android.R.id.content),
+                "Uploading Your Document, Please wait...", Snackbar.LENGTH_INDEFINITE);
+        scan = findViewById(R.id.checkBox);
         selectFileButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -54,7 +74,26 @@ public class UploadFiles extends AppCompatActivity {
             }
         });
 
-        // TODO: Implement Document Upload Process
+        submitButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onSubmit();
+            }
+        });
+
+        if (User.getInstance().temp != null) {
+            File f = User.getInstance().temp;
+            Picasso.get().load(f).into(previewFile);
+
+            User.getInstance().temp = null;
+
+            Uri uri = Uri.fromFile(f);
+            String mimeType = getContentResolver().getType(uri);
+            Log.d(TAG, "File Uri: " + uri.toString() + ", Mime Type: " + mimeType);
+
+            this.fileUri = uri;
+            this.mimeType = mimeType;
+        }
     }
 
     private void showFileChooser() {
@@ -95,9 +134,79 @@ public class UploadFiles extends AppCompatActivity {
                             previewFile.setImageResource(R.drawable.pdf_file);
                             break;
                     }
+
+                    fileUri = uri;
+                    this.mimeType = mimeType;
                 }
                 break;
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
+
+
+    private void onSubmit() {
+
+        if (!validateInput())
+            return;
+
+        // Submit
+        snackbar.setAction("Uploading Your Document, Please wait...", null).show();
+        String visibility = null;
+
+        switch (visibilityRadioGroup.getCheckedRadioButtonId()) {
+            case R.id.upload_doc_radio_public: visibility = "public"; break;
+            case R.id.upload_doc_radio_private: visibility = "private"; break;
+        }
+
+        InputStream inputStream = null;
+        try {
+            inputStream = getContentResolver().openInputStream(fileUri);
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "Error Getting Input Stream from Uri");
+            return;
+        }
+
+        DataProvider.getInstance().addDocument(this, nameField.getText().toString(),
+                descField.getText().toString(), visibility, inputStream, mimeType, fileUri, scan.isChecked(),
+                new DataProvider.OnFinished() {
+                    @Override
+                    public void execute() {
+                        //Loading Over
+                        snackbar.dismiss();
+                    }
+                });
+    }
+//Validations
+    private boolean validateInput() {
+        boolean isValid = true;
+
+        if (nameField.getText().toString().isEmpty()) {
+            nameField.setError("File Name is Mandatory");
+            isValid = false;
+        }
+        else{
+        nameField.setError(null);}
+
+        if (descField.getText().toString().isEmpty()) {
+            descField.setError("Enter Description");
+            isValid = false;
+        }
+        else{
+            descField.setError(null);
+        }
+
+        int isSelected = visibilityRadioGroup.getCheckedRadioButtonId();
+        if(isSelected==-1){
+            Toast.makeText(UploadFiles.this,"You have not selected any File Visibilty Option",Toast.LENGTH_LONG).show();
+            isValid=false;
+        }
+
+        if (fileUri == null || mimeType == null) {
+            Toast.makeText(this, "Please select any file to upload.", Toast.LENGTH_LONG).show();
+            return false;
+        }
+
+        return isValid;
+    }
+
 }
